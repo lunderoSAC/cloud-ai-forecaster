@@ -7,7 +7,7 @@ from statsforecast.utils import generate_series
 
 from tornado.web import RequestHandler
 from swagger_params import ForecasterPostParameter
-from utils.datemaker import parse_week_to_date, parse_date_to_week
+from utils.datemaker import parse_week_to_date, parse_date_to_week, parse_month_to_date
 
 PERIODOS = dict(M=12, D=30, W=7)
 
@@ -50,12 +50,15 @@ class ForecasterHandler(RequestHandler):
 
         if not err:
             season_length = PERIODOS[periodo]
-            horizon = 4
+            horizon = 3
             freq = periodo
             if periodo == 'W':
                 freq = 'D'
                 fechas = [parse_week_to_date(d) for d in fechas]
-
+                periodo = 'W-MON'
+            elif periodo == 'M':
+                freq, periodo = periodo, 'MS'
+                fechas = [parse_month_to_date(d) for d in fechas]
             Y_train_df = generate_series(n_series=1, freq=freq, min_length=len(fechas), max_length=len(fechas))
             Y_train_df.ds = fechas
             Y_train_df.ds = pd.to_datetime(Y_train_df.ds, infer_datetime_format=True)
@@ -70,9 +73,9 @@ class ForecasterHandler(RequestHandler):
                 freq=periodo,
                 n_jobs=-1)
 
-            result = model.forecast(horizon).reset_index()[1:]
+            result = model.forecast(horizon).reset_index()
 
-            if periodo == 'W':
+            if periodo == 'W-MON':
                 result.ds = result.ds.apply(lambda x: parse_date_to_week(x))
 
             mensaje = dict(
